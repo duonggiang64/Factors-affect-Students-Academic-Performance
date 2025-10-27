@@ -1,0 +1,242 @@
+---
+title: "Factors affect Students'academic performance"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+date: "2022-12-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Input data
+
+```{r}
+library("tidyverse")
+data <- read.csv("C:/Users/hacke/Downloads/exams.csv")
+colnames(data) <- c('Gender','Race.ethicity','Parental Education', 'Lunch', 'Test Preparation', 'Math', 'Reading', 'Writing')
+df <- data.frame(data)
+```
+
+## Change gender data to integer
+
+```{r}
+library(tidyverse)
+Gender = ifelse(data$Gender=="male", 0, 1)
+Test.preparation = ifelse(data$`Test Preparation`=="none", 0, 1)
+Parental.Education = case_when(data$`Parental Education`=="bachelor's degree" ~ 4,
+                        data$`Parental Education`=="high school" ~ 1,
+                        data$`Parental Education`=="some college" ~ 3,
+                        data$`Parental Education`=="associate's degree" ~ 2,
+               data$`Parental Education`=="master's degree" ~ 5         )
+Lunch = ifelse(data$Lunch=="free/reduced", 0, 1)
+df <- data.frame(Gender, Test.preparation, Parental.Education,Lunch, data$Math, data$Reading, data$Writing)
+colnames(df) <- c('Gender','Test Preparation','Parental Education', 'Lunch', 'Math', 'Reading', 'Writing')
+```
+## Classification
+```{r}
+Avg <- (df$Math+df$Reading+df$Writing)/3
+df <- cbind(df, Avg)
+ranking = case_when(df$Avg>="70" ~ "Good",
+                        df$Avg <="69" ~ "Bad")
+                        
+df1 <- cbind(df,ranking)
+```
+
+## Install packages
+
+```{r}
+install.packages("stargazer", repos = "http://cran.us.r-project.org")
+library("stargazer")
+```
+## Descriptive
+
+```{r}
+library("stargazer")
+stargazer(subset(data[c("Math", "Reading", "Writing")]),
+ title="Table 1: Summary Statistics", type = "text", digits=1, out="table3.txt")
+
+# Create gender table
+library("tidyverse")
+gender <- data %>%
+  group_by(Gender)%>% 
+  summarise_at(vars("Math", "Reading", "Writing"),mean)
+gender <- pivot_longer(gender, cols = c(Math, Reading, Writing ), names_to = "Score" )
+gender
+# Draw barplot based on Gender
+library(ggplot2)
+p1 <- ggplot(data = gender, aes(x= Score,fill = Gender))+
+	geom_bar(aes(y = value),
+	position = "dodge", stat = "identity")
+p1 <- p1 + labs(x = 'Subject', y = 'Mean', 
+	title = "Academic Performance by Gender") 
+p1
+# Create Parental Education table
+Education <- data %>%
+  group_by(`Parental Education`)%>% 
+  summarise_at(vars("Math", "Reading", "Writing"),mean)
+Education <- pivot_longer(Education, cols = c(Math, Reading, Writing ), names_to = "Score" )
+Education
+
+# Draw barplot based on Parental Education
+library(ggplot2)
+p2 <- ggplot(data = Education, aes(x= Score,fill = `Parental Education`))+
+	geom_bar(aes(y = value),
+	position = "dodge", stat = "identity")
+p2 <- p2 + labs(x = 'Subject', y = 'Mean', 
+	title = "Academic Performance by Parental Education ") 
+p2
+
+# Create Test preparation course table
+Preparation <- data %>%
+  group_by(`Test Preparation`)%>% 
+  summarise_at(vars("Math", "Reading", "Writing"),mean)
+Preparation <- pivot_longer(Preparation, cols = c(Math, Reading, Writing ), names_to = "Score" )
+Preparation
+
+# Draw barplot based on Parental Education
+p3 <- ggplot(data = Preparation, aes(x= Score,fill = `Test Preparation`))+
+	geom_bar(aes(y = value),
+	position = "dodge", stat = "identity")
+p3 <- p3 + labs(x = 'Subject', y = 'Mean', 
+	title = "Academic Performance by Test preparation course") 
+p3
+
+# Create Lunch table
+Lunch <- data %>%
+  group_by(Lunch)%>% 
+  summarise_at(vars("Math", "Reading", "Writing"),mean)
+Lunch <- pivot_longer(Lunch, cols = c(Math, Reading, Writing ), names_to = "Score" )
+Lunch
+
+# Draw barplot based on Lunch
+p4 <- ggplot(data = Lunch, aes(x= Score,fill = Lunch))+
+	geom_bar(aes(y = value),
+	position = "dodge", stat = "identity")
+p4 <- p4 + labs(x = 'Subject', y = 'Mean', 
+	title = "Academic Performance by Lunch") 
+p4
+
+```
+
+# Correlation Matrix
+
+```{r}
+library(stargazer)
+correlation.matrix <- cor(df[,c("Test Preparation","Parental Education","Lunch", "Math", "Reading", "Writing")])
+stargazer(correlation.matrix, type='text', title="Correlation Matrix")
+
+# Correlation plot
+install.packages("corrplot", repos = "http://cran.us.r-project.org")
+library("corrplot")
+colnames(correlation.matrix) <- c('Prep','Edu','Lunch' , 'M', 'R', 'W')
+corrplot.mixed(correlation.matrix,bg = "gray")
+```
+
+## Linear Regression
+
+```{r}
+install.packages("equatiomatic", repos='http://cran.us.r-project.org')
+library(equatiomatic)
+library(stargazer)
+# Math score
+mathlm <- lm(Math~ Lunch + Parental.Education + Test.preparation, data= df)
+extract_eq(mathlm, use_coefs = TRUE,coef_digits = 2,)
+# Reading score
+readinglm <- lm(Reading~ Lunch + Parental.Education + Test.preparation, data= df)
+extract_eq(readinglm, use_coefs = TRUE,coef_digits = 2,)
+# Writing score
+writinglm <- lm(Writing~ Lunch + Parental.Education + Test.preparation, data= df)
+extract_eq(writinglm, use_coefs = TRUE,coef_digits = 2,)
+## Create Regression table
+stargazer(mathlm, readinglm, writinglm,type = 'text', title="Regression Table",
+align=TRUE, dep.var.labels=c("Math Score","Reading Score", "Writing score"),
+covariate.labels=c("Lunch","Parental Education Level",
+"Test Preparation Course"))
+
+```
+
+## Descriptive data
+
+```{r}
+library(dplyr)
+Edufreq <- data %>%
+  group_by(`Parental Education`) %>% 
+  summarise(n = n())
+
+Genfreq <- data %>%
+  group_by(Gender) %>% 
+  summarise(n = n())
+
+Lunchfreq <- data %>%
+  group_by(Lunch) %>% 
+  summarise(n = n())
+
+Testfreq <- data %>%
+  group_by(`Test Preparation`) %>% 
+  summarise(n = n())
+
+library(ggplot2)
+G1 <- ggplot(Genfreq, aes(x = Gender, y = n)) +
+  geom_bar(fill = "#0073C2FF", stat = "identity") +
+  geom_text(aes(label = n),
+    colour = "white", size = 3,
+    vjust = 1.5, position = position_dodge(.9))
+G1 <- G1 + labs(x = "Gender", y = "Counts")
+
+G2 <- ggplot(Edufreq, aes(x =`Parental Education`, y = n)) +
+  geom_bar(fill = "#0073C2FF", stat = "identity") +
+  geom_text(aes(label = n),
+    colour = "white", size = 3,
+    vjust = 1.5, position = position_dodge(.9))
+G2 <- G2 + labs(x = "Parental Education", y = "Counts")
+
+G3 <- ggplot(Testfreq, aes(x =`Test Preparation`, y = n)) +
+  geom_bar(fill = "#0073C2FF", stat = "identity") +
+  geom_text(aes(label = n),
+    colour = "white", size = 3,
+    vjust = 1.5, position = position_dodge(.9))
+G3 <- G3 + labs(x = "Test Preparation", y = "Counts")
+
+G4 <- ggplot(Lunchfreq, aes(x =Lunch, y = n)) +
+  geom_bar(fill = "#0073C2FF", stat = "identity") +
+  geom_text(aes(label = n),
+    colour = "white", size = 3,
+    vjust = 1.5, position = position_dodge(.9))
+G4 <- G4 + labs(x = "Lunch", y = "Counts")
+G1
+G2
+G3
+G4
+
+```
+## Build random forest
+```{r}
+library(randomForest)
+scoreRF <-randomForest(factor(ranking)~ Gender + df1$`Test Preparation`+ df1$`Parental Education`+ Lunch,df1)
+scoreRF
+```
+## Importance 
+```{r}
+importance <- importance(scoreRF)
+
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[ ,'MeanDecreaseGini'],2))
+
+# Create a rank variable based on importance
+rankImportance <- varImportance %>%
+  mutate(Rank = paste0('#',dense_rank(desc(Importance))))
+
+# Use ggplot2 to visualize the relative importance of variables
+ggplot(rankImportance, aes(x = reorder(Variables, Importance), 
+                           y = Importance, fill = Importance)) +
+  geom_bar(stat='identity') + 
+  geom_text(aes(x = Variables, y = 0.5, label = Rank),
+            hjust=0, vjust=0.55, size = 4, colour = 'red') +
+  labs(y="Importance", x="Variables", title="Importance of Variables") +
+  coord_flip() + 
+  theme_classic()
+```
